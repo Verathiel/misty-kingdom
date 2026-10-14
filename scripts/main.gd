@@ -19,6 +19,9 @@ var zoom_label: Label
 var zoom_level: float = 1.0
 var camera_offset := Vector2.ZERO
 var mouse_pan_active := false
+var left_press_active := false
+var left_press_position := Vector2.ZERO
+var left_dragged := false
 var last_mouse_position := Vector2.ZERO
 var touch_positions: Dictionary = {}
 var touch_moved: Dictionary = {}
@@ -171,7 +174,7 @@ func _build_ui() -> void:
 	col.add_child(clear)
 
 	var help := Label.new()
-	help.text = "PC: kolečko = zoom, pravé tlačítko = posun. Mobil: dva prsty = zoom, tažení = posun, klepnutí = stavba."
+	help.text = "PC: kolečko = zoom, tažení levým nebo pravým tlačítkem = posun. Mobil: dva prsty = zoom, tažení = posun, klepnutí = stavba."
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help.add_theme_color_override("font_color", Color("f0dfb5"))
 	col.add_child(help)
@@ -230,13 +233,30 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_RIGHT or event.button_index == MOUSE_BUTTON_MIDDLE:
 			mouse_pan_active = event.pressed
 			last_mouse_position = event.position
-		elif event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			_handle_place(_screen_to_map(event.position))
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				left_press_active = true
+				left_press_position = event.position
+				last_mouse_position = event.position
+				left_dragged = false
+			else:
+				if left_press_active and not left_dragged:
+					_handle_place(_screen_to_map(event.position))
+				left_press_active = false
+				left_dragged = false
 
-	elif event is InputEventMouseMotion and mouse_pan_active:
-		camera_offset += event.relative
-		last_mouse_position = event.position
-		queue_redraw()
+	elif event is InputEventMouseMotion:
+		if mouse_pan_active:
+			camera_offset += event.relative
+			last_mouse_position = event.position
+			queue_redraw()
+		elif left_press_active and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+			if not left_dragged and event.position.distance_to(left_press_position) > 8.0:
+				left_dragged = true
+			if left_dragged:
+				camera_offset += event.relative
+				last_mouse_position = event.position
+				queue_redraw()
 
 	elif event is InputEventScreenTouch:
 		if event.pressed:
